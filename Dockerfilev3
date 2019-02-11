@@ -1,8 +1,11 @@
-FROM alpine:3.9
+FROM php:7.2.4-fpm-alpine
 
 LABEL maintainer="NGINX Docker Maintainers <docker-maint@nginx.com>"
 
-ENV NGINX_VERSION 1.14.2
+ENV NGINX_VERSION 1.15.8
+ENV WORDPRESS_VERSION 4.9.8
+
+# INSTALLING NGINX
 
 RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
 	&& CONFIG="\
@@ -49,7 +52,6 @@ RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
 		--with-compat \
 		--with-file-aio \
 		--with-http_v2_module \
-		
 	" \
 	&& addgroup -S nginx \
 	&& adduser -D -S -h /var/cache/nginx -s /sbin/nologin -G nginx nginx \
@@ -66,13 +68,14 @@ RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
 		libxslt-dev \
 		gd-dev \
 		geoip-dev \
+	# installing PHP
 		php7 \
         	php7-ctype \
-        	php7-curl \
+	        php7-curl \
 	        php7-dom \
-	        php7-fpm \
+     		php7-fpm \
 	        php7-gd \
-        	php7-gettext \
+	        php7-gettext \
 	        php7-json \
 	        php7-mcrypt \
 	        php7-mysqli \
@@ -128,7 +131,7 @@ RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
 	&& strip /usr/sbin/nginx* \
 	&& strip /usr/lib/nginx/modules/*.so \
 	&& rm -rf /usr/src/nginx-$NGINX_VERSION \
-	\
+	\	
 	# Bring in gettext so we can get `envsubst`, then throw
 	# the rest away. To do this, we need to install `gettext`
 	# then move `envsubst` out of the way so `gettext` can
@@ -153,22 +156,35 @@ RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
 	\
 	# forward request and error logs to docker log collector
 	&& ln -sf /dev/stdout /var/log/nginx/access.log \
-	&& ln -sf /dev/stderr /var/log/nginx/error.log \ 
+	&& ln -sf /dev/stderr /var/log/nginx/error.log \
 	
-
+        # configuring wordpress
+        
+       # && mkdir -p /var/www/html \
+       # && cd /var/www/html \
+       # && curl -fSL https://wordpress.org/wordpress-4.9.8.tar.gz -o wordpress.tar.gz \
+       # && tar -xzC /var/www/html --strip-components=1 -f wordpress.tar.gz \
+       # && rm -rf wordpress.tar.gz \
+       # && mv /var/www/html/wp-config-sample.php /var/www/html/wp-config.php \
+       # && mkdir -p /var/www/html/wp-content/plugins/redis \
 
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY nginx.vh.default.conf /etc/nginx/conf.d/default.conf
 COPY docker.conf /etc/php7/php-fpm.d/docker.conf
-#COPY wp-redis-user-session-storage.php /var/www/html/wp-content/plugins/redis
+COPY wp-redis-user-session-storage.php /var/www/html/wp-content/plugins/redis
 COPY docker-entrypoint.sh /usr/local/bin
 COPY tes.php /var/www/html
 
-RUN docker-entrypoint.sh
+VOLUME ./html:/var/www/html/wp-content
+VOLUME ./logs/nginx:/var/log/nginx
+# EOF SETTING UP PHP
+
+
 
 EXPOSE 80
 
 
 STOPSIGNAL SIGTERM
 
+#CMD ["docker-entrypoint.sh"]
 CMD ["nginx", "-g", "daemon off;"]
